@@ -2,7 +2,7 @@ import java.util.BitSet;
 
 public class AisEncoder {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         // Example ship data
         int mmsi = 610000950; // Maritime Mobile Service Identity
         int navigationalStatus = 0; // Under way using engine
@@ -15,9 +15,23 @@ public class AisEncoder {
         int trueHeading = 270; // True heading in degrees
         int timestamp = 60; // UTC second when the report was generated
 
-        String aisSentence = encodeAisSentence(mmsi, navigationalStatus, rateOfTurn, speedOverGround, positionAccuracy, longitude, latitude, courseOverGround, trueHeading, timestamp);
-        String aivdmSentence = createAivdmSentence(aisSentence);
-        System.out.println("AIVDM Sentence: " + aivdmSentence);
+        for (int i = 0; i < 10; i++) {
+            // Update latitude and longitude based on speed over ground and true heading
+            double distance = (speedOverGround / 10.0) / 3600.0; // distance in nautical miles
+            double angle = Math.toRadians(trueHeading / 10.0);
+            latitude += distance * Math.cos(angle) / 60.0; // 1 nautical mile = 1 minute of latitude
+            longitude += distance * Math.sin(angle) / (60.0 * Math.cos(Math.toRadians(latitude))); // Adjust for longitude
+
+            String aisSentence = encodeAisSentence(mmsi, navigationalStatus, rateOfTurn, speedOverGround, positionAccuracy, longitude, latitude, courseOverGround, trueHeading, timestamp);
+            String aivdmSentence = createAivdmSentence(aisSentence);
+            System.out.println("AIVDM Sentence: " + aivdmSentence);
+
+            // Increment timestamp
+            timestamp = (timestamp + 1) % 60;
+
+            // Wait for 1 second
+            Thread.sleep(1000);
+        }
     }
 
     public static String encodeAisSentence(int mmsi, int navigationalStatus, int rateOfTurn, int speedOverGround, int positionAccuracy, double longitude, double latitude, int courseOverGround, int trueHeading, int timestamp) {
@@ -66,29 +80,28 @@ public class AisEncoder {
         return binaryToAis6Bit(binaryString.toString());
     }
 
-    private static void encodeInteger(BitSet bitSet, int value, int startIndex, int length) {
-        for (int i = 0; i < length; i++) {
-            bitSet.set(startIndex + i, (value & (1 << (length - i - 1))) != 0);
-        }
+    public static String createAivdmSentence(String aisSentence) {
+        // Placeholder for creating AIVDM sentence from AIS sentence
+        return "!AIVDM,1,1,,A," + aisSentence + ",0";
     }
 
-    private static String binaryToAis6Bit(String binaryString) {
+    public static String binaryToAis6Bit(String binaryString) {
         StringBuilder ais6BitString = new StringBuilder();
         for (int i = 0; i < binaryString.length(); i += 6) {
-            int value = Integer.parseInt(binaryString.substring(i, i + 6), 2);
+            int value = Integer.parseInt(binaryString.substring(i, Math.min(i + 6, binaryString.length())), 2);
             if (value < 40) {
-                ais6BitString.append((char) (value + 48));
+                value += 48;
             } else {
-                ais6BitString.append((char) (value + 56));
+                value += 56;
             }
+            ais6BitString.append((char) value);
         }
         return ais6BitString.toString();
     }
 
-    private static String createAivdmSentence(String aisSentence) {
-        String payload = aisSentence;
-        int fillBits = (6 - (payload.length() * 6) % 8) % 6;
-        String aivdm = "!AIVDM,1,1,,A," + payload + "," + fillBits;
-        return aivdm;
+    private static void encodeInteger(BitSet bitSet, int value, int startIndex, int length) {
+        for (int i = 0; i < length; i++) {
+            bitSet.set(startIndex + i, (value & (1 << (length - i - 1))) != 0);
+        }
     }
 }
