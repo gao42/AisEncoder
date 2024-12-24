@@ -1,3 +1,6 @@
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.BitSet;
 
 public class AisEncoder {
@@ -15,22 +18,43 @@ public class AisEncoder {
         int trueHeading = 270; // True heading in degrees
         int timestamp = 60; // UTC second when the report was generated
 
-        for (int i = 0; i < 10; i++) {
-            // Update latitude and longitude based on speed over ground and true heading
-            double distance = (speedOverGround / 10.0) / 3600.0; // distance in nautical miles
-            double angle = Math.toRadians(trueHeading / 10.0);
-            latitude += distance * Math.cos(angle) / 60.0; // 1 nautical mile = 1 minute of latitude
-            longitude += distance * Math.sin(angle) / (60.0 * Math.cos(Math.toRadians(latitude))); // Adjust for longitude
+        // UDP socket setup
+        String udpHost = "localhost";
+        int udpPort = 12345;
+        DatagramSocket socket = null;
 
-            String aisSentence = encodeAisSentence(mmsi, navigationalStatus, rateOfTurn, speedOverGround, positionAccuracy, longitude, latitude, courseOverGround, trueHeading, timestamp);
-            String aivdmSentence = createAivdmSentence(aisSentence);
-            System.out.println("AIVDM Sentence: " + aivdmSentence);
+        try {
+            socket = new DatagramSocket();
+            InetAddress address = InetAddress.getByName(udpHost);
 
-            // Increment timestamp
-            timestamp = (timestamp + 1) % 60;
+            for (int i = 0; i < 10; i++) {
+                // Update latitude and longitude based on speed over ground and true heading
+                double distance = (speedOverGround / 10.0) / 3600.0; // distance in nautical miles
+                double angle = Math.toRadians(trueHeading / 10.0);
+                latitude += distance * Math.cos(angle) / 60.0; // 1 nautical mile = 1 minute of latitude
+                longitude += distance * Math.sin(angle) / (60.0 * Math.cos(Math.toRadians(latitude))); // Adjust for longitude
 
-            // Wait for 1 second
-            Thread.sleep(1000);
+                String aisSentence = encodeAisSentence(mmsi, navigationalStatus, rateOfTurn, speedOverGround, positionAccuracy, longitude, latitude, courseOverGround, trueHeading, timestamp);
+                String aivdmSentence = createAivdmSentence(aisSentence);
+                System.out.println("AIVDM Sentence: " + aivdmSentence);
+
+                // Send the AIS sentence over UDP
+                byte[] buffer = aivdmSentence.getBytes();
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, udpPort);
+                socket.send(packet);
+
+                // Increment timestamp
+                timestamp = (timestamp + 1) % 60;
+
+                // Wait for 1 second
+                Thread.sleep(1000);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
         }
     }
 
@@ -80,6 +104,12 @@ public class AisEncoder {
         return binaryToAis6Bit(binaryString.toString());
     }
 
+    public static void encodeInteger(BitSet bitSet, int value, int startIndex, int length) {
+        for (int i = 0; i < length; i++) {
+            bitSet.set(startIndex + i, (value & (1 << (length - i - 1))) != 0);
+        }
+    }
+
     public static String createAivdmSentence(String aisSentence) {
         // Placeholder for creating AIVDM sentence from AIS sentence
         return "!AIVDM,1,1,,A," + aisSentence + ",0";
@@ -97,11 +127,5 @@ public class AisEncoder {
             ais6BitString.append((char) value);
         }
         return ais6BitString.toString();
-    }
-
-    private static void encodeInteger(BitSet bitSet, int value, int startIndex, int length) {
-        for (int i = 0; i < length; i++) {
-            bitSet.set(startIndex + i, (value & (1 << (length - i - 1))) != 0);
-        }
     }
 }
