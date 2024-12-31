@@ -5,7 +5,7 @@ import java.net.InetAddress;
 public class UdpSender {
 
     public static void main(String[] args) {
-        String host = "localhost"; // Host to send the message to
+        String host = "127.0.0.1"; // Host to send the message to
         int port = 10110; // Port to send the message to
         //String message = "!AIVDM,1,1,,B,15MwkT1P37G?fl0EJbR0OwT0@MS,04E"; // Message to send
         String message = "$GPGGA,123519,47.6693,N,122.6893,W,2,06,1.0,100,M,00000,000067"; // Message to send
