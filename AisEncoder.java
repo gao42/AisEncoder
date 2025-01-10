@@ -10,32 +10,36 @@ public class AisEncoder {
         int mmsi = 610000950; // Maritime Mobile Service Identity
         int navigationalStatus = 0; // Under way using engine
         int rateOfTurn = 0; // Not turning
-        int speedOverGround = 150; // Speed over ground in knots * 10
+        int speedOverGround = 100; // Speed over ground in knots * 10
         int positionAccuracy = 1; // High accuracy
-        double longitude = 123.456; // Longitude in degrees
-        double latitude = 45.678; // Latitude in degrees
-        int courseOverGround = 2710; // Course over ground in degrees * 10
+        double longitude = -122.3394; // Longitude in degrees
+        double latitude = 47.6035; // Latitude in degrees
+        int courseOverGround = 2700; // Course over ground in degrees * 10
         int trueHeading = 270; // True heading in degrees
-        int timestamp = 60; // UTC second when the report was generated
+        int timestamp = 80; // UTC second when the report was generated
 
         // UDP socket setup
         String udpHost = "localhost";
-        int udpPort = 12345;
+        int udpPort = 10110;
         DatagramSocket socket = null;
 
         try {
             socket = new DatagramSocket();
             InetAddress address = InetAddress.getByName(udpHost);
 
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 100; i++) {
                 // Update latitude and longitude based on speed over ground and true heading
                 double distance = (speedOverGround / 10.0) / 3600.0; // distance in nautical miles
-                double angle = Math.toRadians(trueHeading / 10.0);
+                double angle = Math.toRadians(trueHeading );
                 latitude += distance * Math.cos(angle) / 60.0; // 1 nautical mile = 1 minute of latitude
                 longitude += distance * Math.sin(angle) / (60.0 * Math.cos(Math.toRadians(latitude))); // Adjust for longitude
 
                 String aisSentence = encodeAisSentence(mmsi, navigationalStatus, rateOfTurn, speedOverGround, positionAccuracy, longitude, latitude, courseOverGround, trueHeading, timestamp);
                 String aivdmSentence = createAivdmSentence(aisSentence);
+
+                String checksum = calculateChecksum(aivdmSentence);
+                aivdmSentence += checksum;
+
                 System.out.println("AIVDM Sentence: " + aivdmSentence);
 
                 // Send the AIS sentence over UDP
@@ -112,7 +116,17 @@ public class AisEncoder {
 
     public static String createAivdmSentence(String aisSentence) {
         // Placeholder for creating AIVDM sentence from AIS sentence
-        return "!AIVDM,1,1,,A," + aisSentence + ",0";
+        return "!AIVDM,1,1,,A," + aisSentence + ",*";
+    }
+
+    private static String calculateChecksum(String nmeaSentence) {
+        int checksum = 0;
+        // Start after the '$' and stop before the '*'
+        for (int i = 1; i < nmeaSentence.indexOf('*'); i++) {
+            checksum ^= nmeaSentence.charAt(i);
+        }
+        // Return the checksum as a two-digit hexadecimal value
+        return String.format("%02X", checksum);
     }
 
     public static String binaryToAis6Bit(String binaryString) {
